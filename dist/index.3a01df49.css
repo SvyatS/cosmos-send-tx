@@ -1,0 +1,27 @@
+.modal-content {
+  width: 300px;
+  height: 400px;
+}
+
+#connect-ledger {
+  width: 17rem;
+  height: 9rem;
+  background-color: #fff;
+  border: none;
+}
+
+#connect-ledger:hover {
+  background-color: #edeff3;
+}
+
+.modal-body {
+  background-color: #f7f9fd;
+}
+
+#url, .url {
+  text-align: center;
+  color: green;
+  margin-top: 160px;
+}
+
+/*# sourceMappingURL=index.3a01df49.css.map */
