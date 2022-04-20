@@ -1,57 +1,48 @@
 import { Decimal } from "decimal-js-sdk";
 import TransportWebUSB from "@ledgerhq/hw-transport-webusb";
+import secp256k1 from "secp256k1/elliptic";
 import CosmosApp from "./src";
-
-//Infuria provider for Ropsten network
+import { createSignMsg, createBroadcastTx } from '@tendermint/sig';
+import { bytesToBase64 } from '@tendermint/belt';
 
 const decimalOptions = {
     restURL: 'https://devnet-gate.decimalchain.com/api/rpc/'
   }
 
 const decimal = new Decimal(decimalOptions);  
-// const provider = new ethers.providers.JsonRpcProvider("https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161");
+
+const request = async (url) => {
+    try {
+        const responce = await fetch(url);
+        return responce.json();
+    }
+    catch {
+        return {}
+    }   
+}
 
 
-let chainId;
+let chainId = 4;
 let gasPrice;
-let addressWallet = 'dx1z4x4r0ljrkserqrqpn65g98h50mjkc0qxas0ps';
+let addressWallet = 'dx1ndgvlye77dmuct2ncr4m8ghmfkwp7p8semks5w';
+let publicKey;
 let recipient = "dx14kskueht0ul2qme5qmwjvlmjr9thd0x3x9ffrw";
-let value = 1;
+let value = 20;
 let gasLimit = 1000000;
 let nonce;
 let _cosmos;
-
-
+const path = [44, 60, 0, 0, 0];
 
 
 document.getElementById("connect-ledger").onclick = async function () {
-
-    // let unsignTx = await decimal.prepareTx('coin/send_coin', (value * Math.pow(10, 18)).toString());
-    // let signMeta = await decimal.getMeta(wallet = { address: addressWallet });
-
-    // const signature = await _cosmos.signTransaction("44'/60'/0'/0/0", unsignedTx);
-
-    // console.info({unsignTx, signMeta})
-
-
-
-
-    //Connecting to the Ledger Nano with USB protocol
     const transport = await TransportWebUSB.create();
 
-
-    const path = [44, 118, 5, 0, 3];
-    
     //Getting an Cosmos instance and get the Ledger Nano cosmos account public key
     _cosmos = new CosmosApp(transport);
-    const { bech32_address: address } = await _cosmos.getAddressAndPubKey(path, "cosmos");
+    const wallet = await _cosmos.getAddressAndPubKey(path, "dx");
+    let address = wallet.bech32_address;
 
-    console.log(address);
-
-
-    //Get some properties from provider
-    // gasPrice = (await provider.getGasPrice())._hex;
-    // gasPrice = parseInt(gasPrice,16) * 1.15;
+    console.log(wallet);
 
     //Fill the inputs with the default value
     addressWallet = address;
@@ -70,54 +61,57 @@ document.getElementById("tx-transfer").onclick = async function () {
     recipient =  document.getElementById("recipient").value;
     value =  document.getElementById("value").value;
     gasLimit =  parseInt(document.getElementById("gasLimit").value);
-    // nonce =  await provider.getTransactionCount(addressWallet, "latest");
 
-    //Building transaction with the information gathered
-    const transaction = {
-        to: recipient,
-        gasPrice: "0x" + parseInt(gasPrice).toString(16),
-        // gasLimit: ethers.utils.hexlify(gasLimit),
-        // nonce: nonce,
-        chainId: chainId,
-        data: "0x00",
-        // value: ethers.utils.parseUnits(value, "ether")._hex,
+    const account_info = await request('https://devnet-gate.decimalchain.com/api/rpc/accounts/' + addressWallet);
+    const node_info = await request('https://devnet-gate.decimalchain.com/api/rpc/node_info');
+
+    let signMeta = {
+        account_number: account_info?.result?.value?.account_number ?? '0',
+        sequence: account_info?.result?.value?.sequence ?? '0',
+        chain_id: node_info?.node_info?.network || null
     }
 
+    // let unsignTx = await decimal.prepareTx('coin/send_coin', {
+    //     coin: {
+    //         amount: (value * Math.pow(10, 18)).toString(),
+    //         denom: "del",
+    //     },
+    //     receiver: recipient,
+    //     sender: addressWallet,
+    // });
 
-    let unsignTx = await decimal.prepareTx('coin/send_coin', (value * Math.pow(10, 18)).toString());
-    let signMeta = await decimal.getMeta(wallet = { address: addressWallet });
+    let unsignTx = await decimal.prepareTx('validator/delegate', {
+        coin: {
+            amount: (value * Math.pow(10, 18)).toString(),
+            denom: "del",
+        },
+        delegator_address: addressWallet,
+        validator_address: "dxvaloper1lx4lvt8sjuxj8vw5dcf6knnq0pacre4wx926l8",
+    });
 
-    const signature = await _cosmos.signTransaction("44'/60'/0'/0/0", unsignedTx);
+    publicKey = (await _cosmos.publicKey(path)).compressed_pk;
 
-    // Parse the signature
-    signature.r = "0x"+signature.r;
-    signature.s = "0x"+signature.s;
-    signature.v = parseInt(signature.v);
-    signature.from = addressWallet;
+    let signatures = {
+        signature: "",
+        pub_key:   {
+            type:  'tendermint/PubKeySecp256k1',
+            value: bytesToBase64(publicKey)
+        }
+    };
 
-    console.log()
+    const message = JSON.stringify(createSignMsg(unsignTx, signMeta));
+   
+    const signature = await _cosmos.sign([44, 60, 0, 0, 0], message);
+    let tx = JSON.parse(message);
+
+    tx.msg = tx.msgs;
+    tx.msgs = undefined;
+
+    signatures.signature = bytesToBase64(secp256k1.signatureImport(signature.signature));
+    tx.signatures = [signatures];
 
 
-
-
-
-
-
-    // //Serializing the transaction to pass it to Ledger Nano for signing
-    // let unsignedTx = ethers.utils.serializeTransaction(transaction).substring(2);
-
-    // //Sign with the Ledger Nano (Sign what you see)
-    
-
-    
-
-    //Serialize the same transaction as before, but adding the signature on it
-    // let signedTx = ethers.utils.serializeTransaction(transaction, signature);
-
-    //Sending the transaction to the blockchain
-    // const hash = (await provider.sendTransaction(signedTx)).hash;
-
-    //Display the Ropsten etherscan on the screen
-    // const url = "https://ropsten.etherscan.io/tx/" + hash;
-    // document.getElementById("url").innerHTML = url;
+    // const broadcastTx = await decimal.getTransaction('coin/send_coin', tx);
+    const result = await decimal.postTx({mode: "sync", tx }, { sendTxDirectly: true });
+    console.log(result);
 }

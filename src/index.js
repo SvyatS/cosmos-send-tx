@@ -37,7 +37,7 @@ export default class CosmosApp {
   }
 
   static serializeHRP(hrp) {
-    if (hrp == null || hrp.length < 3 || hrp.length > 83) {
+    if (hrp == null || hrp.length < 2 || hrp.length > 83) {
       throw new Error("Invalid HRP");
     }
     const buf = Buffer.alloc(1 + hrp.length);
@@ -199,7 +199,7 @@ export default class CosmosApp {
       case 1:
         return publicKeyv1(this, serializedPath);
       case 2: {
-        const data = Buffer.concat([CosmosApp.serializeHRP("cosmos"), serializedPath]);
+        const data = Buffer.concat([CosmosApp.serializeHRP("dx"), serializedPath]);
         return publicKeyv2(this, data);
       }
       default:

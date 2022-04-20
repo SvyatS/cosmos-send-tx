@@ -1,7 +1,7 @@
 import { CLA, errorCodeToString, INS, processErrorResponse } from "./common";
 
 export function serializePathv1(path) {
-  if (path == null || path.length < 3) {
+  if (path == null || path.length < 2) {
     throw new Error("Invalid path.");
   }
   if (path.length > 10) {

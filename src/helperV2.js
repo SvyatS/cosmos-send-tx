@@ -3,6 +3,7 @@ import { CLA, errorCodeToString, INS, PAYLOAD_TYPE, processErrorResponse } from 
 
 export function serializePathv2(path) {
   if (!path || path.length !== 5) {
+    console.log(path);
     throw new Error("Invalid path.");
   }
 
